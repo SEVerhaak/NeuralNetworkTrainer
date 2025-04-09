@@ -15,11 +15,15 @@ const addTrainingsDataButton = document.getElementById('add-to-training-data-but
 const trainButton = document.getElementById('train-button')
 const detectButton = document.getElementById('detect-button')
 const saveButton = document.getElementById('save-button')
+const testButton = document.getElementById('test-button')
 
 const emotionSelector = document.getElementById('emotions');
 
 let faceLandmarks = [];
 let handLandmarks = [];
+
+let trainingsData = {}
+let testData
 
 // NeuralNetwork init
 ml5.setBackend("webgl");
@@ -49,18 +53,55 @@ toggleVideoButton.addEventListener('click', () => {
     }
 })
 
+testButton.addEventListener('click', () => {
+    testTraining();
+})
+
 // add current pose to training data
 addTrainingsDataButton.addEventListener('click', () => {
     trainButton.disabled = false;
-    console.log('adding data:');
-    console.log(normalizeHandData());
-    neuralNetwork.addData(normalizeHandData(), {label: `${emotionSelector.value}`});
+
+    // adds a key to an object based on the current selected value
+    const key = emotionSelector.value;
+    const data = normalizeHandData();
+
+    // if it doesnt exist create the key entry
+    if (!trainingsData[key]) {
+        trainingsData[key] = [];
+    }
+
+    //push data into the big array
+    trainingsData[key].push(data);
+
+    console.log('trainingsData object:');
+    console.log(trainingsData);
+
+    //neuralNetwork.addData(normalizeHandData(), {label: `${emotionSelector.value}`});
 });
+
+function splitTrainingData(dataObject, trainRatio = 0.8) {
+    const trainData = {};
+    const testData = {};
+
+    for (const key in dataObject) {
+        if (dataObject.hasOwnProperty(key)) {
+            const allSamples = dataObject[key];
+            const shuffled = [...allSamples].sort(() => Math.random() - 0.5); // Shuffle randomly
+
+            const splitIndex = Math.floor(shuffled.length * trainRatio);
+            trainData[key] = shuffled.slice(0, splitIndex);
+            testData[key] = shuffled.slice(splitIndex);
+        }
+    }
+
+    return { trainData, testData };
+}
+
 
 // start AI Training Model (Takes some time to load)
 trainButton.addEventListener('click', () => {
-    startTraining();
-})
+    startTraining().then(finishedTraining);
+}, false);
 
 // detect the current pose
 detectButton.addEventListener('click', () => {
@@ -71,10 +112,19 @@ saveButton.addEventListener('click', () => {
     saveTraining();
 })
 
+
 async function startTraining() {
+    let splitData = splitTrainingData(trainingsData);
+
+    testData = splitData.testData;
+    console.log(testData);
+
+    await addDataSet(splitData.trainData);
+
     await neuralNetwork.normalizeData();
-    neuralNetwork.train({epochs: 20}, () => finishedTraining());
+    neuralNetwork.train({epochs: 20}, () => alert('Done!'));
 }
+
 
 async function detectPose() {
     const results = await neuralNetwork.classify(normalizeHandData())
@@ -87,7 +137,29 @@ async function saveTraining() {
 
 function finishedTraining() {
     saveButton.disabled = false;
-    alert('done');
+}
+
+async function testTraining(){
+    for (const key in testData) {
+        if (testData.hasOwnProperty(key)) {
+            const samples = testData[key];
+            for (let i = 0; i < samples.length; i++) {
+                const sample = samples[i];
+                const results = await neuralNetwork.classify(sample)
+
+                const bestPrediction = results.reduce((prev, current) =>
+                    current.confidence > prev.confidence ? current : prev
+                ).label;
+
+                if (bestPrediction === key) {
+                    console.log('correct')
+                } else {
+                    console.log('incorrect')
+                }
+                //console.log(bestPrediction);
+            }
+        }
+    }
 }
 
 // init
@@ -95,6 +167,7 @@ async function init() {
     await camera.start();
     toggleVideoButton.disabled = false;
     addTrainingsDataButton.disabled = false;
+    emotionSelector.disabled = false;
 }
 
 // ==== FaceMesh Setup ====
@@ -137,7 +210,6 @@ function normalizeHandData() {
 
             flatHandArray.push(x, y, z);
         }
-        console.log('Normalized flatHandArray', flatHandArray);
         return flatHandArray;
     }
     return null;
@@ -164,6 +236,19 @@ function normalizeFaceData() {
     }
     return null;
 }
+
+async function addDataSet(trainData){
+    for (const key in trainData) {
+        if (trainData.hasOwnProperty(key)) {
+            const samples = trainData[key];
+            for (let i = 0; i < samples.length; i++) {
+                const sample = samples[i];
+                neuralNetwork.addData(sample, { label: `${key}` });
+            }
+        }
+    }
+}
+
 
 // Draw loop
 function drawLandmarksFunc() {

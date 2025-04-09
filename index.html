@@ -14,57 +14,114 @@
                autoplay
                playsinline
                width="640"
-               height="480"
-               style="position: absolute; top: 0; left: 0; transform: scale(-1, 1); z-index: 0; display: none"></video>
+               height="480"></video>
 
         <canvas id="face_canvas"
                 width="640"
-                height="480"
-                style="position: absolute; top: 0; left: 0; border:1px solid #ccc; transform: scale(-1, 1); z-index: 1;"></canvas>
+                height="480"></canvas>
     </div>
 
-    <div style="text-align: center; margin-top: 10px; margin-bottom: 10px;">
-        <button id="start-webcam" type="button">Start Tracking</button>
-        <button id="toggle-video" type="button" disabled>Toggle Video</button>
-        <button id="add-to-training-data-button" type="button" disabled>Add to training data</button>
-        <button id="train-button" type="button" disabled>Train this computer to love ❤️</button>
-        <button id="detect-button" type="button" disabled>See if this computer can feel empathy (Detect)</button>
-        <button id="save-button" type="button" disabled>Save your creation!</button>
+    <div id="wrapper">
+        <div class="flex-box">
+            <div id="settings">
+                <button id="start-webcam" type="button">Start Tracking</button>
+                <button id="toggle-video" type="button" disabled>Toggle Video</button>
+            </div>
+            <div id="data-add-panel">
+                <label id="emotions-label" for="emotions">Choose an emotion for this computer to learn:</label>
+                <div class="flex-box">
+                    <select name="emotions" id="emotions" disabled>
+                        <!--
+                        <option value="happy">Happiness: 😁</option>
+                        <option value="sad">Sadness: 😢</option>
+                        <option value="shocked">Surprise: 😲</option>
+                        <option value="angry">Anger: 😡</option>
+                        -->
+                        <option value="openHand">open hand</option>
+                        <option value="fist">fist</option>
+                        <option value="thumbsUp">ThumbsUp</option>
+                    </select>
+                    <button id="add-to-training-data-button" type="button" disabled>Add to training data</button>
+                </div>
+            </div>
+        </div>
+        <div id="training-panel">
+            <button id="train-button" type="button" disabled>Train this computer to love ❤️</button>
+            <button id="detect-button" type="button" disabled>See if this computer can feel empathy (Detect)</button>
+            <button id="save-button" type="button" disabled>Save your creation!</button>
+            <button id="test-button" type="button">Test your creation!</button>
+
+        </div>
     </div>
 
-    <label for="emotions">Choose an emotion for this computer to learn:</label>
-
-    <select name="emotions" id="emotions" style="
-    padding: 8px 12px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
-    background-color: #1a1a1a;
-    width: 100%;
-    text-align: center;
-    margin-top: 10px;
-">
-        <!--
-        <option value="happy">Happiness: 😁</option>
-        <option value="sad">Sadness: 😢</option>
-        <option value="shocked">Surprise: 😲</option>
-        <option value="angry">Anger: 😡</option>
-        -->
-        <option value="openHand">open hand</option>
-        <option value="fist">fist</option>
-        <option value="thumbsUp">ThumbsUp</option>
-
-    </select>
 
 </div>
 
 <script type="module" src="/src/main.js"></script>
 <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
 <style>
-    #tfjs-visor-container{
+    #tfjs-visor-container {
         color: black;
     }
+
+    #emotions-label {
+        margin-bottom: 10px;
+    }
+
+    .flex-box {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        margin-bottom: 15px;
+        gap: 25px;
+    }
+
+    #settings {
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+    }
+
+    #settings button {
+        margin: 5px;
+    }
+
+    #wrapper {
+        text-align: center;
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+
+    #emotions {
+        padding: 8px 12px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+        background-color: #1a1a1a;
+        width: 100%;
+        text-align: center;
+        margin-top: 10px;
+    }
+
+    #face_canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        border: 1px solid #ccc;
+        transform: scale(-1, 1);
+        z-index: 1;
+    }
+
+    #input_video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: scale(-1, 1);
+        z-index: 0;
+        display: none
+    }
+
 </style>
 </body>
 </html>
