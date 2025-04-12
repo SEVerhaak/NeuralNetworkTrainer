@@ -9,52 +9,56 @@
 <body>
 <div id="app">
     <h1>The worlds first computer with empathy</h1>
-    <div style="position: relative; width: 640px; height: 480px; margin: 0 auto;">
-        <video id="input_video"
-               autoplay
-               playsinline
-               width="640"
-               height="480"></video>
+    <div class="main-container">
+        <div id="video-container">
+            <video id="input_video"
+                   autoplay
+                   playsinline
+                   width="640"
+                   height="480"></video>
 
-        <canvas id="face_canvas"
-                width="640"
-                height="480"></canvas>
-    </div>
+            <canvas id="face_canvas"
+                    width="640"
+                    height="480"></canvas>
+        </div>
 
-    <div id="wrapper">
-        <div class="flex-box">
-            <div id="settings">
-                <button id="start-webcam" type="button">Start Tracking</button>
-                <button id="toggle-video" type="button" disabled>Toggle Video</button>
-            </div>
-            <div id="data-add-panel">
-                <label id="emotions-label" for="emotions">Choose an emotion for this computer to learn:</label>
-                <div class="flex-box">
-                    <select name="emotions" id="emotions" disabled>
-                        <!--
-                        <option value="happy">Happiness: 😁</option>
-                        <option value="sad">Sadness: 😢</option>
-                        <option value="shocked">Surprise: 😲</option>
-                        <option value="angry">Anger: 😡</option>
-                        -->
-                        <option value="openHand">open hand</option>
-                        <option value="fist">fist</option>
-                        <option value="thumbsUp">ThumbsUp</option>
-                    </select>
-                    <button id="add-to-training-data-button" type="button" disabled>Add to training data</button>
+        <div id="wrapper">
+            <div class="flex-box">
+                <div id="settings">
+                    <button id="start-webcam" type="button">Start Tracking</button>
+                    <button id="toggle-video" type="button" disabled>Toggle Video</button>
+                </div>
+                <div id="data-add-panel">
+                    <label id="emotions-label" for="emotions">Choose a gesture for this computer to learn:</label>
+                    <div class="flex-box">
+                        <select name="emotions" id="emotions" disabled>
+                            <option value="openHandL">Open Hand L</option>
+                            <option value="fistL">Fist L</option>
+                            <option value="thumbsUpL">Thumbs-Up L</option>
+                            <option value="thumbsDownL">Thumbs-Down L</option>
+                            <option value="openHandR">Open Hand R</option>
+                            <option value="fistR">Fist R</option>
+                            <option value="thumbsUpR">Thumbs-Up R</option>
+                            <option value="thumbsDownR">Thumbs-Down R</option>
+                        </select>
+                        <button id="add-to-training-data-button" type="button" disabled>Add to training data</button>
+                        <button id="add-to-test-data-button" type="button" disabled>Add to test data</button>
+                        <button id="download-json-button" type="button" disabled>Donwload JSON Data!</button>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div id="training-panel">
-            <button id="train-button" type="button" disabled>Train this computer to love ❤️</button>
-            <button id="detect-button" type="button" disabled>See if this computer can feel empathy (Detect)</button>
-            <button id="save-button" type="button" disabled>Save your creation!</button>
-            <button id="test-button" type="button">Test your creation!</button>
-
+            <div id="training-panel">
+                <button id="train-button" type="button" disabled>Train the model with given data</button>
+                <button id="detect-button" type="button" disabled>Detect pose
+                </button>
+                <button id="save-button" type="button" disabled>Save your creation!</button>
+                <button id="test-button" type="button" disabled>Test your creation!</button>
+                <h3>Upload a JSON file</h3>
+                <input type="file" id="jsonFileInput" accept=".json"/>
+            </div>
         </div>
     </div>
-
-
+    <div id="confusion-matrix"></div>
 </div>
 
 <script type="module" src="/src/main.js"></script>
@@ -64,32 +68,88 @@
         color: black;
     }
 
-    #emotions-label {
-        margin-bottom: 10px;
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: #1a1a1a;
+        color: white;
+        font-family: sans-serif;
     }
 
+    #app {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .main-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 2rem;
+        flex-wrap: wrap;
+    }
+
+    /* Video and canvas container */
+    #video-container {
+        position: relative;
+        width: 640px;
+        height: 480px;
+        border: 1px solid #ccc;
+    }
+
+    #input_video,
+    #face_canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: scale(-1, 1);
+    }
+
+    #input_video {
+        z-index: 0;
+        display: none;
+    }
+
+    #face_canvas {
+        z-index: 1;
+    }
+
+    /* Control panel wrapper */
+    #wrapper {
+        flex: 1;
+        min-width: 300px;
+    }
+
+    /* Buttons and select menu layout */
     .flex-box {
         display: flex;
         flex-direction: row;
-        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-end;
         margin-bottom: 15px;
-        gap: 25px;
     }
 
-    #settings {
+    #training-panel {
         display: flex;
-        align-items: center;
         flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 1rem;
     }
-
-    #settings button {
-        margin: 5px;
-    }
-
-    #wrapper {
-        text-align: center;
-        margin-top: 10px;
-        margin-bottom: 10px;
+    #settings{
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 1rem;
     }
 
     #emotions {
@@ -97,31 +157,50 @@
         font-size: 16px;
         border: 1px solid #ccc;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
         background-color: #1a1a1a;
-        width: 100%;
+        color: white;
         text-align: center;
-        margin-top: 10px;
+        width: 100%;
+        max-width: 300px;
     }
 
-    #face_canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        border: 1px solid #ccc;
-        transform: scale(-1, 1);
-        z-index: 1;
+    button {
+        padding: 8px 12px;
+        border: none;
+        background-color: #333;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
     }
 
-    #input_video {
-        position: absolute;
-        top: 0;
-        left: 0;
-        transform: scale(-1, 1);
-        z-index: 0;
-        display: none
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
+    /* Confusion matrix styles */
+    .confusion-table {
+        border-collapse: collapse;
+        width: 100%;
+        font-family: sans-serif;
+        margin-top: 1rem;
+    }
+
+    .confusion-table th,
+    .confusion-table td {
+        border: 1px solid #323232;
+        padding: 8px;
+        text-align: center;
+    }
+
+    .confusion-table th {
+        background-color: #323232;
+    }
+
+    .row-label {
+        font-weight: bold;
+        background-color: #323232;
+    }
 </style>
 </body>
 </html>

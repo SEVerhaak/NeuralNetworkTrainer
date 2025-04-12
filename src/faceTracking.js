@@ -12,10 +12,12 @@ const ctx = canvas.getContext('2d');
 const startWebcamButton = document.getElementById('start-webcam')
 const toggleVideoButton = document.getElementById('toggle-video')
 const addTrainingsDataButton = document.getElementById('add-to-training-data-button');
+const addTestDataButton = document.getElementById('add-to-test-data-button');
 const trainButton = document.getElementById('train-button')
 const detectButton = document.getElementById('detect-button')
 const saveButton = document.getElementById('save-button')
 const testButton = document.getElementById('test-button')
+const downloadButton = document.getElementById('download-json-button')
 
 const emotionSelector = document.getElementById('emotions');
 
@@ -24,10 +26,36 @@ let handLandmarks = [];
 
 let trainingsData = {}
 let testData
+let splitData
 
 // NeuralNetwork init
 ml5.setBackend("webgl");
-const neuralNetwork = ml5.neuralNetwork({task: 'classification', debug: true})
+
+const options = {
+    task: 'classification',
+    debug: true,
+    layers: [
+        {
+            type: 'dense',
+            units: 32,
+            activation: 'relu',
+        }, {
+            type: 'dense',
+            units: 32,
+            activation: 'relu',
+        }, {
+            type: 'dense',
+            units: 32,
+            activation: 'relu',
+        },
+        {
+            type: 'dense',
+            activation: 'softmax',
+        },
+    ]
+}
+
+const neuralNetwork = ml5.neuralNetwork(options)
 
 // Camera var
 const camera = new Camera(video, {
@@ -43,6 +71,7 @@ const camera = new Camera(video, {
 // start button
 startWebcamButton.addEventListener('click', () => {
     init();
+
 })
 // toggle video backdrop button
 toggleVideoButton.addEventListener('click', () => {
@@ -60,6 +89,7 @@ testButton.addEventListener('click', () => {
 // add current pose to training data
 addTrainingsDataButton.addEventListener('click', () => {
     trainButton.disabled = false;
+    downloadButton.disabled = false;
 
     // adds a key to an object based on the current selected value
     const key = emotionSelector.value;
@@ -79,24 +109,20 @@ addTrainingsDataButton.addEventListener('click', () => {
     //neuralNetwork.addData(normalizeHandData(), {label: `${emotionSelector.value}`});
 });
 
-function splitTrainingData(dataObject, trainRatio = 0.8) {
-    const trainData = {};
-    const testData = {};
+addTestDataButton.addEventListener('click', () => {
+    const key = emotionSelector.value;
+    const data = normalizeHandData();
 
-    for (const key in dataObject) {
-        if (dataObject.hasOwnProperty(key)) {
-            const allSamples = dataObject[key];
-            const shuffled = [...allSamples].sort(() => Math.random() - 0.5); // Shuffle randomly
-
-            const splitIndex = Math.floor(shuffled.length * trainRatio);
-            trainData[key] = shuffled.slice(0, splitIndex);
-            testData[key] = shuffled.slice(splitIndex);
-        }
+    if(splitData.testData[key]) {
+        splitData.testData[key].push(data);
     }
 
-    return { trainData, testData };
-}
+    console.log(splitData.testData);
+})
 
+downloadButton.addEventListener('click', () => {
+    downloadObjectAsJson(trainingsData, 'JSON_DATA');
+})
 
 // start AI Training Model (Takes some time to load)
 trainButton.addEventListener('click', () => {
@@ -113,8 +139,35 @@ saveButton.addEventListener('click', () => {
 })
 
 
+document.getElementById('jsonFileInput').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+
+    if (file) {
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                trainingsData = JSON.parse(e.target.result);
+                console.log('Parsed JSON Object:', trainingsData);
+                trainButton.disabled = false;
+                downloadButton.disabled = false;
+            } catch (err) {
+                console.error('Invalid JSON file:', err);
+                alert('The uploaded file is not valid JSON.');
+            }
+        };
+
+        reader.readAsText(file);
+    }
+});
+
+
 async function startTraining() {
-    let splitData = splitTrainingData(trainingsData);
+    addTestDataButton.disabled = false;
+    detectButton.disabled = false;
+    testButton.disabled = false;
+
+    splitData = splitTrainingData(trainingsData);
 
     testData = splitData.testData;
     console.log(testData);
@@ -122,7 +175,7 @@ async function startTraining() {
     await addDataSet(splitData.trainData);
 
     await neuralNetwork.normalizeData();
-    neuralNetwork.train({epochs: 20}, () => alert('Done!'));
+    neuralNetwork.train({epochs: 50}, () => alert('Done!'));
 }
 
 
@@ -139,28 +192,95 @@ function finishedTraining() {
     saveButton.disabled = false;
 }
 
-async function testTraining(){
+async function testTraining() {
+    const correctArray = [];
+    const wrongArray = [];
+    const confusionMatrix = {};
+    const allLabels = new Set();
+
+    // Build confusion matrix
     for (const key in testData) {
         if (testData.hasOwnProperty(key)) {
             const samples = testData[key];
+
+            // Loop through the array of each key
             for (let i = 0; i < samples.length; i++) {
                 const sample = samples[i];
-                const results = await neuralNetwork.classify(sample)
+                const results = await neuralNetwork.classify(sample);
 
-                const bestPrediction = results.reduce((prev, current) =>
-                    current.confidence > prev.confidence ? current : prev
-                ).label;
-
-                if (bestPrediction === key) {
-                    console.log('correct')
-                } else {
-                    console.log('incorrect')
+                let bestPrediction = results[0];
+                for (let j = 1; j < results.length; j++) {
+                    if (results[j].confidence > bestPrediction.confidence) {
+                        bestPrediction = results[j];
+                    }
                 }
-                //console.log(bestPrediction);
+
+                allLabels.add(key);
+                allLabels.add(bestPrediction.label);
+
+                if (!confusionMatrix[key]) {
+                    confusionMatrix[key] = {};
+                }
+                if (!confusionMatrix[key][bestPrediction.label]) {
+                    confusionMatrix[key][bestPrediction.label] = 0;
+                }
+                confusionMatrix[key][bestPrediction.label]++;
+
+                if (bestPrediction.label === key) {
+                    correctArray.push(bestPrediction.label);
+                    console.log('correct');
+                } else {
+                    wrongArray.push(bestPrediction.label);
+                    console.log('incorrect');
+                }
             }
         }
     }
+
+    const total = correctArray.length + wrongArray.length;
+    const accuracy = ((correctArray.length / total) * 100).toFixed(2);
+
+    // Build HTML table
+    const labels = Array.from(allLabels).sort();
+    let html = `<h3>Accuracy and Confusion Matrix</h3>`;
+    html += `<p>Correct: ${correctArray.length}, Wrong: ${wrongArray.length}, Accuracy: ${accuracy}%</p>`;
+    html += `<table class="confusion-table"><thead><tr><th>Actual \\ Predicted</th>`;
+
+    // Add headers for each label
+    for (const label of labels) {
+        html += `<th>${label}</th>`;
+    }
+    html += `</tr></thead><tbody>`;
+
+    // Add rows for confusion matrix
+    for (const actual of labels) {
+        html += `<tr><td class="row-label">${actual}</td>`;
+        for (const predicted of labels) {
+            const count = confusionMatrix[actual]?.[predicted] || 0;
+
+            // Set color: green for correct, red for incorrect
+            let bgColor = "";
+            if (count > 0) {
+                if (actual === predicted) {
+                    bgColor = "rgba(0, 200, 0, 0.5)"; // Green for correct
+                } else {
+                    bgColor = "rgba(200, 0, 0, 0.5)"; // Red for incorrect
+                }
+            }
+
+            html += `<td style="background-color: ${bgColor}">${count}</td>`;
+        }
+        html += `</tr>`;
+    }
+
+    html += `</tbody></table>`;
+
+    // Inject into the page
+    document.getElementById("confusion-matrix").innerHTML = html;
 }
+
+
+
 
 // init
 async function init() {
@@ -215,26 +335,14 @@ function normalizeHandData() {
     return null;
 }
 
-function normalizeFaceData() {
-    const flatFaceArray = [];
-
-    if (faceLandmarks[0].length > 0) {
-        const noseTip = faceLandmarks[0][1]; // Nose tip as reference (index 1)
-
-        for (let i = 0; i < faceLandmarks[0].length; i++) {
-            const landmark = faceLandmarks[0][i];
-
-            const x = landmark.x - noseTip.x;
-            const y = landmark.y - noseTip.y;
-            const z = landmark.z - noseTip.z;
-
-            flatFaceArray.push(x, y, z);
-        }
-
-        console.log('Normalized flatFaceArray', flatFaceArray);
-        return flatFaceArray;
-    }
-    return null;
+function downloadObjectAsJson(exportObj, exportName){
+    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+    let downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href",     dataStr);
+    downloadAnchorNode.setAttribute("download", exportName + ".json");
+    document.body.appendChild(downloadAnchorNode); // required for firefox
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
 }
 
 async function addDataSet(trainData){
@@ -254,15 +362,6 @@ async function addDataSet(trainData){
 function drawLandmarksFunc() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw face landmarks with MediaPipe style
-    for (const landmarks of faceLandmarks) {
-        drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, {color: '#C0C0C070', lineWidth: 1});
-        drawConnectors(ctx, landmarks, FACEMESH_RIGHT_EYE, {color: 'red'});
-        drawConnectors(ctx, landmarks, FACEMESH_LEFT_EYE, {color: 'red'});
-        drawConnectors(ctx, landmarks, FACEMESH_FACE_OVAL, {color: 'white'});
-        drawLandmarks(ctx, landmarks, {color: 'white', lineWidth: 1, radius: 1});
-    }
-
     for (const hand of handLandmarks) {
         drawConnectors(ctx, hand, HAND_CONNECTIONS, {
             color: 'blue',
@@ -276,13 +375,25 @@ function drawLandmarksFunc() {
     }
 }
 
-// FaceMesh callback
-/*
-faceMesh.onResults((results) => {
-    faceLandmarks = results.multiFaceLandmarks || [];
-    drawLandmarksFunc();
-});
- */
+function splitTrainingData(dataObject, trainRatio = 0.8) {
+    const trainData = {};
+    const testData = {};
+
+    for (const key in dataObject) {
+        if (dataObject.hasOwnProperty(key)) {
+            const allSamples = dataObject[key];
+            const shuffled = [...allSamples].sort(() => Math.random() - 0.5); // Shuffle randomly
+
+            const splitIndex = Math.floor(shuffled.length * trainRatio);
+            trainData[key] = shuffled.slice(0, splitIndex);
+            testData[key] = shuffled.slice(splitIndex);
+        }
+    }
+    console.log('Training data:', trainData);
+    console.log('Test data:', testData);
+
+    return { trainData, testData };
+}
 
 // Hands callback
 hands.onResults((results) => {
